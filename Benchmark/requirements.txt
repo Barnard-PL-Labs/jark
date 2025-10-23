@@ -1,0 +1,16 @@
+transformers>=4.35.0
+torch>=2.1.0
+accelerate>=0.21.0
+
+# # Optional: for local quantized models (e.g., GPTQ / GGUF / ExLlama)
+# optimum
+# auto-gptq
+
+# Evaluation utilities
+numpy
+asttokens
+tqdm
+
+# Project-specific
+# Only needed if you use csv writing and parsing
+pandas
