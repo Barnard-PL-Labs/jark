@@ -25,11 +25,28 @@ def load_logits_processor(processor_path, grammar_dir, tokenizer):
     logits_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(logits_module)
 
-    grammar_table = np.load(os.path.join(grammar_dir, "compiled_tables.npy"), allow_pickle=True).item()
-    terminal_map = json.load(open(os.path.join(grammar_dir, "terminal_map.json")))
+    # Load grammar files if grammar_dir is provided
+    grammar_table = None
+    terminal_map = None
+    if grammar_dir and os.path.exists(grammar_dir):
+        grammar_table_path = os.path.join(grammar_dir, "compiled_tables.npy")
+        terminal_map_path = os.path.join(grammar_dir, "terminal_map.json")
+        if os.path.exists(grammar_table_path):
+            grammar_table = np.load(grammar_table_path, allow_pickle=True).item()
+        if os.path.exists(terminal_map_path):
+            terminal_map = json.load(open(terminal_map_path))
 
+    # Try to pass grammar_dir to processors that support it (like Lark processor)
+    # Check if get_logits_processor accepts grammar_dir parameter
+    import inspect
+    sig = inspect.signature(logits_module.get_logits_processor)
+    if 'grammar_dir' in sig.parameters:
+        processor_fn = logits_module.get_logits_processor(grammar_table, terminal_map, tokenizer, grammar_dir=grammar_dir)
+    else:
+        processor_fn = logits_module.get_logits_processor(grammar_table, terminal_map, tokenizer)
+    
     return LogitsProcessorList([
-        CustomLogitsProcessor(logits_module.get_logits_processor(grammar_table, terminal_map, tokenizer))
+        CustomLogitsProcessor(processor_fn)
     ])
 
 
@@ -39,6 +56,21 @@ class CustomLogitsProcessor:
         self.state = {}
 
     def __call__(self, input_ids, scores):
+        # Update state with current generated sequence (excluding the prompt)
+        # input_ids shape: (batch_size, sequence_length)
+        # We track only the newly generated tokens (after the initial prompt)
+        if 'initial_prompt_length' not in self.state:
+            # First call - store the initial prompt length
+            self.state['initial_prompt_length'] = input_ids.shape[1]
+            self.state['generated_ids'] = []
+        else:
+            # Extract only the newly generated tokens (after prompt)
+            prompt_length = self.state['initial_prompt_length']
+            if input_ids.shape[1] > prompt_length:
+                # Get the generated portion (excluding prompt)
+                generated_ids = input_ids[0, prompt_length:].cpu().tolist()
+                self.state['generated_ids'] = generated_ids
+        
         return self.processor_fn(scores, self.state)
 
 

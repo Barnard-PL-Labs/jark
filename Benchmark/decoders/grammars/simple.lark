@@ -1,0 +1,19 @@
+// Simple calculator grammar allowing digits 1-9, parentheses, and operators
+
+start: expr
+
+?expr: expr "+" term
+     | expr "-" term
+     | term
+
+?term: term "*" factor
+     | term "/" factor
+     | factor
+
+?factor: NUMBER
+        | "(" expr ")"
+
+NUMBER: /[1-9][1-9]*/
+
+%ignore " "
+

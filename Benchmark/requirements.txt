@@ -11,6 +11,10 @@ numpy
 asttokens
 tqdm
 
+# Grammar processing
+lark-parser>=1.1.0
+regex>=2024.5.15
+
 # Project-specific
 # Only needed if you use csv writing and parsing
 pandas
